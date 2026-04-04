@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from pydantic import BaseModel
+from typing import Optional
 
 from app.database import get_db
 from app.models import User, Item, Alert
@@ -11,8 +12,6 @@ from app.services.auth import validate_init_data
 router = APIRouter()
 
 
-# ── Auth dependency ──────────────────────────────────────────────────────────
-
 def get_tg_user(x_init_data: str = Header(...)) -> dict:
     data = validate_init_data(x_init_data)
     if not data or "user" not in data:
@@ -20,14 +19,10 @@ def get_tg_user(x_init_data: str = Header(...)) -> dict:
     return data["user"]
 
 
-# ── Regions ──────────────────────────────────────────────────────────────────
-
 @router.get("/regions")
 async def regions():
     return await stalcraft.get_regions()
 
-
-# ── Users ─────────────────────────────────────────────────────────────────────
 
 class UserCreate(BaseModel):
     region: str
@@ -61,8 +56,6 @@ async def get_user(
     return {"tg_id": user.tg_id, "region": user.region}
 
 
-# ── Items ─────────────────────────────────────────────────────────────────────
-
 @router.get("/items/search")
 async def search_items(q: str, db: AsyncSession = Depends(get_db)):
     if len(q) < 2:
@@ -80,8 +73,6 @@ async def search_items(q: str, db: AsyncSession = Depends(get_db)):
     ]
 
 
-# ── Auction ───────────────────────────────────────────────────────────────────
-
 @router.get("/auction/{item_id}/lots")
 async def auction_lots(
     item_id: str,
@@ -90,7 +81,7 @@ async def auction_lots(
 ):
     user = await db.get(User, tg_user["id"])
     if not user:
-        raise HTTPException(status_code=404, detail="User not found, set region first")
+        raise HTTPException(status_code=404, detail="User not found")
     return await stalcraft.get_lots(user.region, item_id)
 
 
@@ -106,12 +97,12 @@ async def auction_history(
         raise HTTPException(status_code=404, detail="User not found")
     return await stalcraft.get_history(user.region, item_id, limit=limit)
 
-# ── Alerts ────────────────────────────────────────────────────────────────────
 
 class AlertCreate(BaseModel):
     item_id: str
     price_limit: int
-    qlt: int | None = None
+    qlt: Optional[int] = None
+    ptn_min: Optional[int] = None
 
 
 @router.get("/alerts")
@@ -135,6 +126,7 @@ async def get_alerts(
             "icon_url": item.icon_url,
             "price_limit": alert.price_limit,
             "qlt": alert.qlt,
+            "ptn_min": alert.ptn_min,
             "created_at": alert.created_at,
         }
         for alert, item in rows
@@ -147,7 +139,6 @@ async def create_alert(
     tg_user: dict = Depends(get_tg_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # check item exists
     item = await db.get(Item, body.item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -157,11 +148,12 @@ async def create_alert(
         item_id=body.item_id,
         price_limit=body.price_limit,
         qlt=body.qlt,
+        ptn_min=body.ptn_min,
     )
     db.add(alert)
     await db.commit()
     await db.refresh(alert)
-    return {"id": alert.id, "item_id": alert.item_id, "price_limit": alert.price_limit, "qlt": alert.qlt}
+    return {"id": alert.id, "item_id": alert.item_id, "price_limit": alert.price_limit, "qlt": alert.qlt, "ptn_min": alert.ptn_min}
 
 
 @router.delete("/alerts/{alert_id}")
@@ -171,10 +163,7 @@ async def delete_alert(
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        delete(Alert).where(
-            Alert.id == alert_id,
-            Alert.user_id == tg_user["id"]
-        )
+        delete(Alert).where(Alert.id == alert_id, Alert.user_id == tg_user["id"])
     )
     await db.commit()
     if result.rowcount == 0:

@@ -19,7 +19,7 @@ async def start(msg: Message):
     kb = InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(
             text="🔫 Открыть AUC BOT",
-            web_app=WebAppInfo(url="https://aucbot-frontend-git-master-mookzzs-projects.vercel.app/")  # заменить
+            web_app=WebAppInfo(url="https://your-frontend.vercel.app")  # заменить
         )
     ]])
     await msg.answer(

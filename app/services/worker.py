@@ -13,6 +13,7 @@ def set_bot(bot):
     global _bot
     _bot = bot
 
+QLT_NAMES = {0:'Обычный',1:'Необычный',2:'Особый',3:'Редкий',4:'Исключительный',5:'Легендарный'}
 
 async def check_alerts():
     if not _bot:
@@ -26,7 +27,6 @@ async def check_alerts():
         )
         rows = result.all()
 
-    # group by (region, item_id) to minimize API calls
     groups: dict[tuple, list] = {}
     for alert, user, item in rows:
         key = (user.region, alert.item_id)
@@ -34,33 +34,40 @@ async def check_alerts():
 
     for (region, item_id), alerts in groups.items():
         try:
-            data = await stalcraft.get_lots(region, item_id, limit=200)
+            data = await stalcraft.get_lots(region, item_id)
             lots = data.get("lots", [])
             if not lots:
                 continue
 
             for alert, user, item in alerts:
-                # filter by qlt if set
-                matching = [
-                    l for l in lots
-                    if alert.qlt is None or l.get("additional", {}).get("qlt") == alert.qlt
-                ]
+                matching = []
+                for lot in lots:
+                    add = lot.get("additional", {})
+                    lot_qlt = add.get("qlt")
+                    lot_ptn = add.get("ptn", 0)
+
+                    if alert.qlt is not None and lot_qlt != alert.qlt:
+                        continue
+                    if alert.ptn_min is not None and lot_ptn < alert.ptn_min:
+                        continue
+                    matching.append(lot)
+
                 if not matching:
                     continue
 
                 min_price = min(
-                    l.get("buyoutPrice") or l.get("currentPrice") or 999_999_999
-                    for l in matching
+                    lot.get("buyoutPrice") or lot.get("currentPrice") or 999_999_999
+                    for lot in matching
                 )
 
                 if min_price <= alert.price_limit:
                     name = item.name_ru or item.name_en
-                    qlt_label = {1:'Обычный',2:'Необычный',3:'Особый',4:'Редкий',5:'Исключительный',6:'Легендарный'}.get(alert.qlt, '')
-                    qlt_str = f" [{qlt_label}]" if qlt_label else ""
+                    qlt_str = f" [{QLT_NAMES[alert.qlt]}]" if alert.qlt is not None and alert.qlt in QLT_NAMES else ""
+                    ptn_str = f" +{alert.ptn_min}" if alert.ptn_min else ""
                     try:
                         await _bot.send_message(
                             user.tg_id,
-                            f"🔔 <b>{name}{qlt_str}</b>\n"
+                            f"🔔 <b>{name}{qlt_str}{ptn_str}</b>\n"
                             f"Цена: <b>{min_price:,}</b> ₽\n"
                             f"Твой лимит: {alert.price_limit:,} ₽",
                             parse_mode="HTML",
@@ -71,4 +78,4 @@ async def check_alerts():
         except Exception as e:
             logger.warning(f"Failed to check {region}/{item_id}: {e}")
 
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(0.3)
