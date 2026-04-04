@@ -7,9 +7,7 @@ from app.services import stalcraft
 
 logger = logging.getLogger(__name__)
 
-# bot instance injected from main.py
 _bot = None
-
 
 def set_bot(bot):
     global _bot
@@ -36,22 +34,33 @@ async def check_alerts():
 
     for (region, item_id), alerts in groups.items():
         try:
-            data = await stalcraft.get_lots(region, item_id, limit=1)
+            data = await stalcraft.get_lots(region, item_id, limit=200)
             lots = data.get("lots", [])
             if not lots:
                 continue
 
-            min_price = lots[0].get("currentPrice") or lots[0].get("buyoutPrice")
-            if min_price is None:
-                continue
-
             for alert, user, item in alerts:
+                # filter by qlt if set
+                matching = [
+                    l for l in lots
+                    if alert.qlt is None or l.get("additional", {}).get("qlt") == alert.qlt
+                ]
+                if not matching:
+                    continue
+
+                min_price = min(
+                    l.get("buyoutPrice") or l.get("currentPrice") or 999_999_999
+                    for l in matching
+                )
+
                 if min_price <= alert.price_limit:
                     name = item.name_ru or item.name_en
+                    qlt_label = {1:'Обычный',2:'Необычный',3:'Особый',4:'Редкий',5:'Исключительный',6:'Легендарный'}.get(alert.qlt, '')
+                    qlt_str = f" [{qlt_label}]" if qlt_label else ""
                     try:
                         await _bot.send_message(
                             user.tg_id,
-                            f"🔔 <b>{name}</b>\n"
+                            f"🔔 <b>{name}{qlt_str}</b>\n"
                             f"Цена: <b>{min_price:,}</b> ₽\n"
                             f"Твой лимит: {alert.price_limit:,} ₽",
                             parse_mode="HTML",
@@ -62,4 +71,4 @@ async def check_alerts():
         except Exception as e:
             logger.warning(f"Failed to check {region}/{item_id}: {e}")
 
-        await asyncio.sleep(0.2)  # небольшая пауза между запросами к API
+        await asyncio.sleep(0.2)

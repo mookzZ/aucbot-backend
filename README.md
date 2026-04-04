@@ -32,7 +32,7 @@ pip install -r requirements.txt
 
 ### 3. Синхронизируй предметы (один раз)
 ```bash
-python scripts/sync_items_fast.py
+python scripts/sync_items.py
 ```
 
 ### 4. Запусти сервер

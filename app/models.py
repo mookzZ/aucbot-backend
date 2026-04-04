@@ -1,6 +1,7 @@
 from datetime import datetime
 from sqlalchemy import BigInteger, String, Integer, ForeignKey, DateTime, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from typing import Optional
 
 
 class Base(DeclarativeBase):
@@ -34,6 +35,7 @@ class Alert(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.tg_id"))
     item_id: Mapped[str] = mapped_column(String(32), ForeignKey("items.id"))
     price_limit: Mapped[int] = mapped_column(Integer)
+    qlt: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     user: Mapped["User"] = relationship(back_populates="alerts")

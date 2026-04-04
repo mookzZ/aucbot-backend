@@ -34,7 +34,7 @@ async def get_lots(region: str, item_id: str, limit: int = 50) -> dict:
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             url,
-            params={"limit": limit, "sort": "current_price", "order": "asc"},
+            params={"limit": limit, "sort": "current_price", "order": "asc", "additional": "true"},
             headers={"Authorization": f"Bearer {token}"},
         )
         resp.raise_for_status()

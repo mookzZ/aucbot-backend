@@ -111,6 +111,7 @@ async def auction_history(
 class AlertCreate(BaseModel):
     item_id: str
     price_limit: int
+    qlt: int | None = None
 
 
 @router.get("/alerts")
@@ -133,6 +134,7 @@ async def get_alerts(
             "name_en": item.name_en,
             "icon_url": item.icon_url,
             "price_limit": alert.price_limit,
+            "qlt": alert.qlt,
             "created_at": alert.created_at,
         }
         for alert, item in rows
@@ -154,11 +156,12 @@ async def create_alert(
         user_id=tg_user["id"],
         item_id=body.item_id,
         price_limit=body.price_limit,
+        qlt=body.qlt,
     )
     db.add(alert)
     await db.commit()
     await db.refresh(alert)
-    return {"id": alert.id, "item_id": alert.item_id, "price_limit": alert.price_limit}
+    return {"id": alert.id, "item_id": alert.item_id, "price_limit": alert.price_limit, "qlt": alert.qlt}
 
 
 @router.delete("/alerts/{alert_id}")
