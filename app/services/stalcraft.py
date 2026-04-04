@@ -41,18 +41,17 @@ async def get_lots(region: str, item_id: str, limit: int = 50) -> dict:
         return resp.json()
 
 
-async def get_history(region: str, item_id: str, limit: int = 20) -> dict:
+async def get_history(region: str, item_id: str, limit: int = 200) -> dict:
     token = await _get_token()
     url = f"{settings.stalcraft_api_url}/{region}/auction/{item_id}/history"
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             url,
-            params={"limit": limit},
+            params={"limit": limit, "additional": "true"},
             headers={"Authorization": f"Bearer {token}"},
         )
         resp.raise_for_status()
         return resp.json()
-
 
 async def get_regions() -> list:
     async with httpx.AsyncClient() as client:

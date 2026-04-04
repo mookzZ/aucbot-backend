@@ -97,14 +97,14 @@ async def auction_lots(
 @router.get("/auction/{item_id}/history")
 async def auction_history(
     item_id: str,
+    limit: int = 200,
     tg_user: dict = Depends(get_tg_user),
     db: AsyncSession = Depends(get_db),
 ):
     user = await db.get(User, tg_user["id"])
     if not user:
-        raise HTTPException(status_code=404, detail="User not found, set region first")
-    return await stalcraft.get_history(user.region, item_id)
-
+        raise HTTPException(status_code=404, detail="User not found")
+    return await stalcraft.get_history(user.region, item_id, limit=limit)
 
 # ── Alerts ────────────────────────────────────────────────────────────────────
 
