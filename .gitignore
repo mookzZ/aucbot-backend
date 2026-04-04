@@ -2,3 +2,4 @@ venv/
 *.exe
 *.pyc
 *.db
+.idea/
