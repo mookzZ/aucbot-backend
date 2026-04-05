@@ -124,6 +124,7 @@ async def get_alerts(
             "name_ru": item.name_ru,
             "name_en": item.name_en,
             "icon_url": item.icon_url,
+            "category": item.category,
             "price_limit": alert.price_limit,
             "qlt": alert.qlt,
             "ptn_min": alert.ptn_min,
