@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import json
 from urllib.parse import unquote
 from app.config import settings
 
@@ -11,6 +12,7 @@ def validate_init_data(init_data: str) -> dict | None:
     """
     parsed = {}
     pairs = []
+    received_hash = None
 
     for part in unquote(init_data).split("&"):
         if "=" in part:
@@ -20,6 +22,9 @@ def validate_init_data(init_data: str) -> dict | None:
             else:
                 pairs.append(f"{key}={value}")
                 parsed[key] = value
+
+    if received_hash is None:
+        return None
 
     pairs.sort()
     data_check_string = "\n".join(pairs)
@@ -35,8 +40,6 @@ def validate_init_data(init_data: str) -> dict | None:
     if not hmac.compare_digest(expected_hash, received_hash):
         return None
 
-    # parse user JSON if present
-    import json
     if "user" in parsed:
         try:
             parsed["user"] = json.loads(parsed["user"])

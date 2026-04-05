@@ -15,6 +15,15 @@ def set_bot(bot):
 
 QLT_NAMES = {0:'Обычный',1:'Необычный',2:'Особый',3:'Редкий',4:'Исключительный',5:'Легендарный'}
 
+def get_lot_price(lot: dict) -> int | None:
+    """Get the best available price from a lot."""
+    # Try buyoutPrice first, then currentPrice, then startPrice
+    for key in ('buyoutPrice', 'currentPrice', 'startPrice'):
+        val = lot.get(key)
+        if val is not None and val > 0:
+            return val
+    return None
+
 async def check_alerts():
     if not _bot:
         return
@@ -26,6 +35,9 @@ async def check_alerts():
             .join(Item, Alert.item_id == Item.id)
         )
         rows = result.all()
+
+    if not rows:
+        return
 
     groups: dict[tuple, list] = {}
     for alert, user, item in rows:
@@ -44,7 +56,7 @@ async def check_alerts():
                 for lot in lots:
                     add = lot.get("additional", {})
                     lot_qlt = add.get("qlt")
-                    lot_ptn = add.get("ptn", 0)
+                    lot_ptn = add.get("ptn", 0) or 0
 
                     if alert.qlt is not None and lot_qlt != alert.qlt:
                         continue
@@ -55,15 +67,21 @@ async def check_alerts():
                 if not matching:
                     continue
 
-                min_price = min(
-                    lot.get("buyoutPrice") or lot.get("currentPrice") or 999_999_999
-                    for lot in matching
-                )
+                # Find minimum price among matching lots
+                prices = [get_lot_price(lot) for lot in matching]
+                prices = [p for p in prices if p is not None]
+
+                if not prices:
+                    continue
+
+                min_price = min(prices)
+
+                logger.info(f"Alert check: item={item_id} user={user.tg_id} min_price={min_price} limit={alert.price_limit}")
 
                 if min_price <= alert.price_limit:
                     name = item.name_ru or item.name_en
                     qlt_str = f" [{QLT_NAMES[alert.qlt]}]" if alert.qlt is not None and alert.qlt in QLT_NAMES else ""
-                    ptn_str = f" +{alert.ptn_min}" if alert.ptn_min else ""
+                    ptn_str = f" +{alert.ptn_min}+" if alert.ptn_min else ""
                     try:
                         await _bot.send_message(
                             user.tg_id,
@@ -72,6 +90,7 @@ async def check_alerts():
                             f"Твой лимит: {alert.price_limit:,} ₽",
                             parse_mode="HTML",
                         )
+                        logger.info(f"Notified {user.tg_id} for {item_id}")
                     except Exception as e:
                         logger.warning(f"Failed to notify {user.tg_id}: {e}")
 
