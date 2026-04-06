@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     stalcraft_api_url: str = "https://eapi.stalcraft.net"
     stalcraft_auth_url: str = "https://exbo.net/oauth/token"
     github_token: str = ""
+    app_secret_token: str = ""
 
     class Config:
         env_file = ".env"
