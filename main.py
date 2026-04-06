@@ -50,7 +50,7 @@ app.add_middleware(
 
 @app.middleware("http")
 async def verify_app_token(request: Request, call_next):
-    if request.url.path in ("/health",):
+    if request.method == "OPTIONS" or request.url.path in ("/health",):
         return await call_next(request)
     token = request.headers.get("X-App-Token")
     if not token or token != settings.app_secret_token:
