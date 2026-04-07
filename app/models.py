@@ -1,6 +1,9 @@
 from datetime import datetime, date
 from typing import Optional
-from sqlalchemy import BigInteger, String, Integer, ForeignKey, DateTime, Date, func, SmallInteger
+from sqlalchemy import (
+    BigInteger, String, Integer, ForeignKey, DateTime, Date,
+    func, SmallInteger, UniqueConstraint
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -46,6 +49,7 @@ class Alert(Base):
 
 class Clan(Base):
     __tablename__ = "clans"
+    __table_args__ = (UniqueConstraint("name", "region", name="uq_clan_name_region"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(128), index=True)
