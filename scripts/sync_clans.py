@@ -10,7 +10,11 @@ import sys
 import os
 from datetime import datetime
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+
+from dotenv import load_dotenv
+load_dotenv(os.path.join(ROOT, ".env"))
 
 import httpx
 from sqlalchemy.dialects.postgresql import insert
@@ -55,12 +59,12 @@ async def fetch_all_clans(token: str, region: str) -> list[dict]:
             batch = data.get("data", [])
             clans.extend(batch)
 
-            total = data.get("total", 0)
+            total = data.get("total") or "?"
             offset += PAGE_SIZE
 
             print(f"  Fetched {len(clans)}/{total}...")
 
-            if len(clans) >= total or len(batch) < PAGE_SIZE:
+            if len(batch) < PAGE_SIZE:
                 break
 
             await asyncio.sleep(0.2)
@@ -96,20 +100,22 @@ async def sync(region: str):
             "synced_at": now,
         })
 
+    BATCH = 500
     async with AsyncSessionLocal() as db:
-        stmt = insert(Clan).values(rows)
-        stmt = stmt.on_conflict_do_update(
-            # name+region уникально идентифицирует клан
-            index_elements=["name", "region"],
-            set_={
-                "tag": stmt.excluded.tag,
-                "alliance": stmt.excluded.alliance,
-                "leader": stmt.excluded.leader,
-                "member_count": stmt.excluded.member_count,
-                "synced_at": stmt.excluded.synced_at,
-            },
-        )
-        await db.execute(stmt)
+        for i in range(0, len(rows), BATCH):
+            batch = rows[i:i + BATCH]
+            stmt = insert(Clan).values(batch)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["name", "region"],
+                set_={
+                    "tag": stmt.excluded.tag,
+                    "alliance": stmt.excluded.alliance,
+                    "leader": stmt.excluded.leader,
+                    "member_count": stmt.excluded.member_count,
+                    "synced_at": stmt.excluded.synced_at,
+                },
+            )
+            await db.execute(stmt)
         await db.commit()
 
     print(f"✅ Synced {len(rows)} clans for region={region}")

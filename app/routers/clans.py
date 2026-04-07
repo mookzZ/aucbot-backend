@@ -3,7 +3,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, UniqueConstraint
+from sqlalchemy import select, or_, UniqueConstraint, func
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
 
@@ -33,7 +33,7 @@ class GridIn(BaseModel):
 
 async def get_or_create_clan(db: AsyncSession, name: str, region: str) -> Clan:
     result = await db.execute(
-        select(Clan).where(Clan.name == name, Clan.region == region)
+        select(Clan).where(func.lower(Clan.name) == name.lower(), Clan.region == region)
     )
     clan = result.scalar_one_or_none()
     if not clan:
@@ -139,9 +139,8 @@ async def clan_history(
         raise HTTPException(status_code=404, detail="Clan not found")
 
     result = await db.execute(
-        select(ClanMatch, TournamentGrid, Clan)
+        select(ClanMatch, TournamentGrid)
         .join(TournamentGrid, ClanMatch.grid_id == TournamentGrid.id)
-        .join(Clan, or_(ClanMatch.clan1_id == clan_id, ClanMatch.clan2_id == clan_id))
         .where(or_(ClanMatch.clan1_id == clan_id, ClanMatch.clan2_id == clan_id))
         .order_by(TournamentGrid.date.desc())
         .limit(limit)
@@ -149,17 +148,10 @@ async def clan_history(
     rows = result.all()
 
     matches_out = []
-    seen_ids = set()
-
-    for match, grid, _ in rows:
-        if match.id in seen_ids:
-            continue
-        seen_ids.add(match.id)
-
-        # resolve opponent
+    for match, grid in rows:
         opponent_id = match.clan2_id if match.clan1_id == clan_id else match.clan1_id
-        opp_result = await db.get(Clan, opponent_id)
-        opponent_name = opp_result.name if opp_result else "Unknown"
+        opp = await db.get(Clan, opponent_id)
+        opponent_name = opp.name if opp else "Unknown"
 
         is_clan1 = match.clan1_id == clan_id
         my_score = match.score1 if is_clan1 else match.score2
